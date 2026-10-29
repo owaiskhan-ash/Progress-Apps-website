@@ -1,6 +1,6 @@
 # Progress Apps — website
 
-A single-app landing page for [Papertrail](https://github.com/owaiskhan-ash/Project-Progress-Widget),
+A single-app landing page for Progress tracker ([Project-Progress-Widget](https://github.com/owaiskhan-ash/Project-Progress-Widget)),
 a minimal Android project tracker with a transparent home-screen widget.
 
 Static HTML, CSS and a few lines of JS. No build step, no dependencies.
@@ -35,3 +35,7 @@ The page is plain static files, so it can be served directly by GitHub Pages
   The page makes no third-party requests.
 - The ring in the widget preview is drawn with inline SVG; the 68% arc animates once on load
   and is skipped under `prefers-reduced-motion`.
+- Layout is 85% of the viewport wide on desktop (100% with side gutters at 900px and below).
+  From 980px the hero splits into headline / copy columns so the wide measure is used.
+- Text blurs in on page load with a short stagger; the whole entrance is disabled under
+  `prefers-reduced-motion`.
