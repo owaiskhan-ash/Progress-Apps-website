@@ -1,19 +1,21 @@
 # Progress Apps — website
 
-A single-app landing page for Progress tracker ([Project-Progress-Widget](https://github.com/owaiskhan-ash/Project-Progress-Widget)),
-a minimal Android project tracker with a transparent home-screen widget.
+A dark, fluorescent landing page for **Progress Apps**: a growing gallery of useful Android apps that are being released free for everyone.
 
-Static HTML, CSS and a few lines of JS. No build step, no dependencies.
+The first featured release is [AutoWall](https://github.com/owaiskhan-ash/Automatic-wallpaper-changer), an automatic wallpaper changer for Android.
 
-```
-index.html      the page
-styles.css      all styling
-assets/         favicon + self-hosted font
-```
+## Design
+
+- Thin, compact typography using self-hosted Inter Tight
+- Near-black background with fluorescent lime, cyan, pink and orange accents
+- Custom CSS hero artwork and AutoWall UI preview (no remote image requests)
+- Minimal responsive interface for mobile
+- Accessible focus states, semantic landmarks and reduced-motion support
+- Custom Progress Apps wordmark and favicon
 
 ## Run locally
 
-Any static server works, for example:
+The site is plain HTML and CSS with no build step or dependencies.
 
 ```sh
 python3 -m http.server 3000
@@ -21,21 +23,14 @@ python3 -m http.server 3000
 
 Then open <http://localhost:3000>.
 
-## Deploy
+## Files
 
-The page is plain static files, so it can be served directly by GitHub Pages
-(branch → root) or any static host.
+```text
+index.html      page structure and copy
+styles.css      layout, artwork, animation, and responsive design
+assets/         self-hosted font, licence, and favicon
+```
 
-## Notes
+## App links
 
-- Download links point to the latest GitHub release (`v1.1.0` at the time of writing).
-  Update them when a new release is tagged.
-- Type is [Inter Tight](https://fonts.google.com/specimen/Inter+Tight), self-hosted as a
-  single 44 KB variable `woff2` at weights 200–400 (SIL OFL, licence included in `assets/`).
-  The page makes no third-party requests.
-- The ring in the widget preview is drawn with inline SVG; the 68% arc animates once on load
-  and is skipped under `prefers-reduced-motion`.
-- Layout is 85% of the viewport wide on desktop (100% with side gutters at 900px and below).
-  From 980px the hero splits into headline / copy columns so the wide measure is used.
-- Text blurs in on page load with a short stagger; the whole entrance is disabled under
-  `prefers-reduced-motion`.
+The AutoWall download button points to the stable `releases/latest/download/AutoWall.apk` URL. Version information currently reflects v1.1.0 (Android 8.0+, approximately 7 MB).
