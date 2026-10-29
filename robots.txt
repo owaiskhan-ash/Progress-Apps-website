@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /favicon-ideas.html
+
+Sitemap: https://progress-apps-website.vercel.app/sitemap.xml
