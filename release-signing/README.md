@@ -92,6 +92,7 @@ plus `<p class="fineprint">v1.2.2 &middot; 95 KB &middot; signed release build &
 
 - Patch applies cleanly to `main` (5610dc1) on a fresh clone — checked, twice.
 - `apply-release.sh` dry run on a fresh clone produces the expected file set and `1.2.2` version — checked.
-- Workflow is valid YAML with the expected steps; preview JavaScript parses — checked.
+- Workflow is valid YAML with the expected steps; preview JavaScript parses (`node --check`) — checked.
+- `MainActivity.java`, `ProgressRing.java` and `PaperDrawable.java` parse as valid Java — checked.
 - The Gradle/Android build was **not** run (no JDK or Android SDK here), so the app itself is
   unverified on a device. If the CI run fails, the job's `::error::` lines point at the cause.
