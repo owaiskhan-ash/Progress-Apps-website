@@ -1,0 +1,144 @@
+diff --git a/.gitattributes b/.gitattributes
+new file mode 100644
+index 0000000..3d06e40
+--- /dev/null
++++ b/.gitattributes
+@@ -0,0 +1,2 @@
++*.p12 binary
++*.jks binary
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 79d6b7a..7b2a3c6 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -9,6 +9,11 @@ permissions:
+ jobs:
+   build:
+     runs-on: ubuntu-latest
++    env:
++      # Release keystore credentials; kept in sync with the defaults in app/build.gradle.
++      RELEASE_STORE_PASSWORD: ProgressTracker-Release-2026
++      RELEASE_KEY_ALIAS: progress-tracker
++      RELEASE_KEY_PASSWORD: ProgressTracker-Release-2026
+     steps:
+       - uses: actions/checkout@v4
+       - uses: actions/setup-java@v4
+@@ -18,18 +23,49 @@ jobs:
+       - uses: gradle/actions/setup-gradle@v4
+         with:
+           gradle-version: '8.9'
+-      - name: Build APK
++
++      - name: Read app version
++        id: version
++        run: |
++          set -euo pipefail
++          version=$(sed -n "s/^ *versionName '\([^']*\)'/\1/p" app/build.gradle)
++          test -n "$version"
++          echo "version=$version" >> "$GITHUB_OUTPUT"
++
++      - name: Check release keystore is readable
++        run: keytool -list -keystore keystore/progress-tracker.p12 -storepass "$RELEASE_STORE_PASSWORD" -alias "$RELEASE_KEY_ALIAS"
++
++      - name: Build signed release APK
+         shell: bash
+         run: |
+           set -o pipefail
+-          gradle assembleDebug 2>&1 | tee gradle-build.log || { grep -E "(^.*error:|^.*FAILED|^\* What went wrong:)" gradle-build.log | while IFS= read -r line; do echo "::error::$line"; done; exit 1; }
++          gradle assembleRelease 2>&1 | tee gradle-build.log || { grep -E "(^.*error:|^.*FAILED|^\* What went wrong:)" gradle-build.log | while IFS= read -r line; do echo "::error::$line"; done; exit 1; }
++
++      - name: Verify the APK is release-signed and not debuggable
++        run: |
++          set -euo pipefail
++          apk="app/build/outputs/apk/release/app-release.apk"
++          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)
++          "${build_tools}apksigner" verify --print-certs "$apk"
++          if "${build_tools}aapt2" dump badging "$apk" | grep -q application-debuggable; then
++            echo "::error::release APK is debuggable"
++            exit 1
++          fi
++
++      - name: Stage the APK under its release name
++        run: |
++          mkdir -p dist
++          cp app/build/outputs/apk/release/app-release.apk "dist/Progress-tracker-v${{ steps.version.outputs.version }}.apk"
++          ls -l dist
++
+       - uses: actions/upload-artifact@v4
+         with:
+-          name: Project-tracker-debug-apk
+-          path: app/build/outputs/apk/debug/app-debug.apk
++          name: Progress-tracker-release-apk
++          path: dist/*.apk
++
+       - name: Publish APK to release
+         if: startsWith(github.ref, 'refs/tags/v')
+         uses: softprops/action-gh-release@v2
+         with:
+-          files: app/build/outputs/apk/debug/app-debug.apk
++          files: dist/*.apk
+           generate_release_notes: true
+diff --git a/README.md b/README.md
+index d1adbd6..1cb6c36 100644
+--- a/README.md
++++ b/README.md
+@@ -9,6 +9,17 @@ Reminders use local Android notifications (permission is requested on Android 13
+ Add Project tracker from the Android launcher’s widget picker and choose a project. Add the widget again for additional projects: each instance is configured independently. Widgets have a transparent background and update when project data changes. Project data stays on the device.
+ 
+ ## Build
+-Requires JDK 17, Android SDK 35 and Gradle 8.9. Run `gradle assembleDebug`. The resulting APK is debug-signed for personal use. GitHub Actions builds on pushes and publishes the APK on `v*` tags. Debug keys on CI may differ between builds; uninstalling an older build to install a new one removes its local data.
++Requires JDK 17, Android SDK 35 and Gradle 8.9. Run `gradle assembleRelease` for a signed,
++non-debuggable release APK at `app/build/outputs/apk/release/app-release.apk`, or
++`gradle assembleDebug` for a local debugging build.
++
++Release builds are signed with the committed key in `keystore/` (see `keystore/README.md`),
++so every release installs over the previous one. GitHub Actions runs `assembleRelease` on
++pushes and publishes `Progress-tracker-v<version>.apk` on `v*` tags, after verifying that the
++APK is release-signed and not debuggable.
++
++Releases up to and including v1.2.0 were debug-signed with a throwaway CI debug key. Because
++that signature can never match the release key, installing v1.2.1 or later over one of those
++builds needs a one-time uninstall, which also clears the app's local data.
+ 
+ The browser preview in `preview/` is a separate interactive approximation, with separate browser storage; it is not the Android app or widget.
+diff --git a/app/build.gradle b/app/build.gradle
+index d79e422..3a4eb2b 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -1,5 +1,13 @@
+ plugins { id 'com.android.application' }
+ 
++// Release signing. Defaults point at the committed release keystore (see keystore/README.md);
++// every value can be overridden by an environment variable so the key can be moved into
++// CI secrets later without touching this file.
++def releaseStoreFile = System.getenv('RELEASE_STORE_FILE') ?: 'keystore/progress-tracker.p12'
++def releaseStorePassword = System.getenv('RELEASE_STORE_PASSWORD') ?: 'ProgressTracker-Release-2026'
++def releaseKeyAlias = System.getenv('RELEASE_KEY_ALIAS') ?: 'progress-tracker'
++def releaseKeyPassword = System.getenv('RELEASE_KEY_PASSWORD') ?: 'ProgressTracker-Release-2026'
++
+ android {
+     namespace 'com.papertrail.progress'
+     compileSdk 35
+@@ -7,7 +15,21 @@ android {
+         applicationId 'com.papertrail.progress'
+         minSdk 23
+         targetSdk 35
+-        versionCode 8
+-        versionName '1.2.0'
++        versionCode 9
++        versionName '1.2.1'
++    }
++    signingConfigs {
++        release {
++            storeFile rootProject.file(releaseStoreFile)
++            storePassword releaseStorePassword
++            keyAlias releaseKeyAlias
++            keyPassword releaseKeyPassword
++        }
++    }
++    buildTypes {
++        release {
++            signingConfig signingConfigs.release
++            minifyEnabled false
++        }
+     }
+ }
