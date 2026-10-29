@@ -1,20 +1,15 @@
-# Making the APK a real release build (v1.2.1)
+# Project tracker v1.2.2 — release + transition fixes
 
-The published APKs were debug builds: CI ran `gradle assembleDebug`, every download was named
-`app-debug.apk`, the app was flagged `android:debuggable`, and the signer was the *public*
-Android debug key that gets regenerated on each CI runner. This folder holds the fix for
-`owaiskhan-ash/Project-Progress-Widget`, ready to apply.
+Two things prepared for `owaiskhan-ash/Project-Progress-Widget`, ready to apply:
 
-I could not push it: this session's GitHub token has read-only access to that repository
-(`git push` and `gh api` writes both return 403). Applying it takes about a minute.
+1. **A real release build.** Published APKs were `assembleDebug` output: signed with the
+   *public* Android debug key, flagged `android:debuggable`, named `app-debug.apk`.
+2. **Darker, quieter transitions.** The page animation slid 28dp sideways over the default
+   *light* window background, so every page change flashed white, and it also replayed on the
+   page you were already on — so saving a milestone re-slid the whole screen.
 
-## What's here
-
-| File | Purpose |
-| --- | --- |
-| `android-release-signing.patch` | Changes to `app/build.gradle`, `.github/workflows/release.yml`, `README.md`, `.gitattributes` |
-| `keystore/progress-tracker.p12` | The release signing key (PKCS#12, alias `progress-tracker`, password `ProgressTracker-Release-2026`) |
-| `keystore/README.md` | Key details, certificate fingerprint, how to move it to CI secrets later |
+I could not push either change: this session's GitHub token is read-only for that repository
+(`git push` and every `gh api` write return 403). Applying takes one command.
 
 ## Apply it
 
@@ -22,60 +17,81 @@ I could not push it: this session's GitHub token has read-only access to that re
 gh repo clone owaiskhan-ash/Project-Progress-Widget
 cd Project-Progress-Widget
 
-git checkout main
-git apply /path/to/release-signing/android-release-signing.patch
-mkdir -p keystore
-cp /path/to/release-signing/keystore/* keystore/
+# review the changes in the working tree first
+REPO_DIR=. /path/to/release-signing/apply-release.sh
 
-git add -A
-git commit -m "Sign releases with a real release key and publish v1.2.1"
-git push origin main
-
-git tag -a v1.2.1 -m "Project tracker v1.2.1 — signed release APK"
-git push origin v1.2.1
+# commit, push main, and tag v1.2.2 to publish the signed APK
+REPO_DIR=. /path/to/release-signing/apply-release.sh --push
 ```
 
-Pushing `main` runs the build and uploads a signed APK as a workflow artifact; pushing the
-`v1.2.1` tag additionally publishes `Progress-tracker-v1.2.1.apk` on a new GitHub release.
+Pushing `main` builds a signed APK as a workflow artifact; pushing the `v1.2.2` tag publishes
+`Progress-tracker-v1.2.2.apk` on a new release.
 
-## What changes
+Build locally instead if you prefer:
 
-- `signingConfigs.release` backed by the committed keystore, with every value overridable by
-  `RELEASE_STORE_FILE` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` /
-  `RELEASE_KEY_PASSWORD` so the key can move into repository secrets later without editing code.
-- CI builds `assembleRelease`, then fails the job unless `apksigner` confirms a release
-  certificate and the APK is *not* debuggable.
-- The release asset is `Progress-tracker-v<version>.apk` instead of `app-debug.apk`.
-- Version bumped to `versionCode 9` / `versionName '1.2.1'`.
+```sh
+gradle assembleRelease   # app/build/outputs/apk/release/app-release.apk
+```
+
+## What's in this folder
+
+| File | Purpose |
+| --- | --- |
+| `android-release-v1.2.2.patch` | All changes: signing config, workflow, transitions, version bump to `versionCode 10` / `1.2.2` |
+| `keystore/progress-tracker.p12` | Release signing key (alias `progress-tracker`, password `ProgressTracker-Release-2026`) |
+| `keystore/README.md` | Key details, certificate fingerprint, how to move it into CI secrets |
+| `apply-release.sh` | Applies the patch + keystore, then (with `--push`) commits, tags and pushes |
+| `preview-v1.2.2.html` | The updated browser preview, so you can feel the new motion before installing anything |
+
+## The transition changes
+
+Page motion:
+
+- Fades in place from **black** instead of sliding sideways: `android:windowBackground` is now
+  `#080A07`, which is what caused the white flash. 200ms, decelerate, 6dp rise.
+- Plays **only when the page actually changes** — home → create → project. A page is identified
+  by a key (`home`, `create`, `project:<id>`); re-rendering the same page is instant and silent.
+- Renaming, undo, deadline changes, editing or deleting a milestone: no page transition at all.
+
+Adding a milestone now owns its own moment:
+
+- the page dims to 45% into the dark background and eases back over 320ms;
+- the ring animates from the previous percentage to the new one over 520ms instead of snapping;
+- the new milestone row fades up 6dp, with a 25ms stagger down the list.
+
+Popups and menus lost their overshoot bounce: 170–190ms scale from 96% → 100% with a
+decelerate curve, and the fluorescent dialog animations went from 220ms to 160ms.
 
 ## Two things to know
 
 1. **One-time uninstall for existing installs.** v1.2.0 and earlier are signed with a different
-   key, so Android will refuse to install v1.2.1 over them ("App not installed"). Uninstall the
-   old build first — that also wipes its local projects and milestones, since data lives in
-   app-private storage. From v1.2.1 onward updates install normally.
-2. **The key is public.** That was your call, and it is still much better than the debug key
-   (which anyone can recreate), but treat it as an identity, not a secret. `keystore/README.md`
-   has the commands to move it to repository secrets when you want to. Back the `.p12` up
-   somewhere; losing it means requiring an uninstall for every future release.
+   key, so Android will refuse to install v1.2.2 over them ("App not installed"). Uninstall the
+   old build first — that also clears its local projects and milestones. From v1.2.2 on, updates
+   install normally.
+2. **The key is committed on purpose** (your call): no CI secrets needed, and far better than the
+   public debug key — but treat it as an identity, not a secret. Back up the `.p12`; losing it
+   means requiring an uninstall for every future release. `keystore/README.md` has the commands
+   to move it into repository secrets later without touching `app/build.gradle`.
 
-## After the release exists
+## Website follow-up (not done here)
 
-The website's download button still points at
-`.../releases/download/v1.1.0/app-debug.apk`, and the fineprint says "37 KB · debug-signed".
-Once `v1.2.1` is published, update `index.html`:
+`index.html` still points at `.../releases/download/v1.1.0/app-debug.apk` and its fineprint says
+"debug-signed". Changing it now would break the download until v1.2.2 is published, so it is
+left alone. After the release exists, either:
 
 ```html
-<a class="button" href="https://github.com/owaiskhan-ash/Project-Progress-Widget/releases/download/v1.2.1/Progress-tracker-v1.2.1.apk">Download the APK …
-<p class="fineprint">v1.2.1 &middot; 95 KB &middot; signed release build &middot; Android 6.0+</p>
+<!-- pinned -->
+href="https://github.com/owaiskhan-ash/Project-Progress-Widget/releases/download/v1.2.2/Progress-tracker-v1.2.2.apk"
+<!-- or always latest; the workflow now also uploads progress-tracker.apk as a stable name -->
+href="https://github.com/owaiskhan-ash/Project-Progress-Widget/releases/latest/download/progress-tracker.apk"
 ```
 
-Say the word and I'll make that edit here instead.
+plus `<p class="fineprint">v1.2.2 &middot; 95 KB &middot; signed release build &middot; Android 6.0+</p>`.
 
 ## Verification status
 
-- The patch applies cleanly to `main` (5610dc1) — checked against a fresh clone.
-- The workflow is valid YAML with the expected steps — checked.
-- The keystore was generated locally and round-trips through a PKCS#12 load — checked.
-- The Gradle/Android build itself was **not** run here (no JDK, no Android SDK in this sandbox),
-  so the first push is the real test. If it fails, the job's `::error::` lines point at the cause.
+- Patch applies cleanly to `main` (5610dc1) on a fresh clone — checked, twice.
+- `apply-release.sh` dry run on a fresh clone produces the expected file set and `1.2.2` version — checked.
+- Workflow is valid YAML with the expected steps; preview JavaScript parses — checked.
+- The Gradle/Android build was **not** run (no JDK or Android SDK here), so the app itself is
+  unverified on a device. If the CI run fails, the job's `::error::` lines point at the cause.
