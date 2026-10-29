@@ -1,4 +1,4 @@
-# Progress Apps — website
+# Progress Apps: website
 
 A dark, fluorescent landing page for **Progress Apps**: a growing gallery of useful Android apps that are being released free for everyone.
 
@@ -8,10 +8,11 @@ The first featured release is [AutoWall](https://github.com/owaiskhan-ash/Automa
 
 - Thin, compact typography using self-hosted Inter Tight
 - Near-black background with fluorescent lime, cyan, pink and orange accents
-- Custom CSS hero artwork and AutoWall UI preview (no remote image requests)
+- Clean typographic hero and a custom AutoWall UI preview with no remote image requests
 - Minimal responsive interface for mobile
 - Accessible focus states, semantic landmarks and reduced-motion support
-- Custom Progress Apps wordmark and favicon
+- Detailed search and social metadata with structured data for AutoWall
+- Custom Progress Apps wordmark plus three favicon concepts
 
 ## Run locally
 
